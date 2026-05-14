@@ -239,11 +239,10 @@ async def generate_video(request: VideoGenerateRequest, ori_req: Request):
     """
     if ori_req.headers.get("X-Dry-Run") == "true":
         print("[Log] Dry Run / Connection Test received.")
-        return {
-            "video_url": "https://example.com/test.mp4",
-            "subtitle_url": "https://example.com/test.srt",
-            "supplementary_url": None
-        }
+        return VideoGenerateResponse(
+            video_url="https://example.com/test.mp4",
+            subtitle_url="https://example.com/test.srt",
+        )
     if pipeline is None:
         raise HTTPException(status_code=503, detail="Pipeline not loaded")
 
