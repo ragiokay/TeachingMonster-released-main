@@ -42,6 +42,40 @@ MAX_VIDEO_BYTES = 3 * 1024 * 1024 * 1024
 MAX_AUX_BYTES = 100 * 1024 * 1024
 MAX_SUPP_FILES = 5
 
+# Set DRIVE_OUTPUT_FOLDER_ID to upload videos to Google Drive (required for 48-hour URL validity).
+DRIVE_OUTPUT_FOLDER_ID = os.getenv("DRIVE_OUTPUT_FOLDER_ID", "")
+
+
+# =============================
+# Google Drive upload
+# =============================
+
+
+def _upload_file_to_drive(local_path: str, filename: str, folder_id: str, mimetype: str = "video/mp4") -> str:
+    """
+    Upload a file to Google Drive, make it publicly readable,
+    and return a direct download URL valid indefinitely.
+    Requires Application Default Credentials (set up via google.colab.auth in the notebook).
+    """
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+    from google.auth import default
+
+    creds, _ = default(scopes=["https://www.googleapis.com/auth/drive"])
+    service = build("drive", "v3", credentials=creds, cache_discovery=False)
+
+    file_meta = {"name": filename, "parents": [folder_id]}
+    media = MediaFileUpload(local_path, mimetype=mimetype, resumable=True)
+    uploaded = service.files().create(body=file_meta, media_body=media, fields="id").execute()
+    file_id = uploaded["id"]
+
+    service.permissions().create(
+        fileId=file_id,
+        body={"type": "anyone", "role": "reader"},
+    ).execute()
+
+    return f"https://drive.google.com/uc?export=download&confirm=t&id={file_id}"
+
 
 # =============================
 # Helper Functions
@@ -278,20 +312,49 @@ async def generate_video(request: VideoGenerateRequest, ori_req: Request):
                 pass
             subtitle_size = 0
 
-        # Construct URLs (in production, these would be actual storage URLs)
-        # For now, we'll use relative paths that can be served via file endpoints
+        # Build URLs.
+        # If DRIVE_OUTPUT_FOLDER_ID is set: upload video to Google Drive so the
+        # link stays valid for 48+ hours (required by competition rules).
+        # Otherwise fall back to ngrok/localhost (valid only while server runs).
         base_url = os.getenv("BASE_URL", "http://localhost:8000")
-        video_url = f"{base_url}/v1/files/{request.request_id}/video"
+
+        if DRIVE_OUTPUT_FOLDER_ID:
+            video_url = _upload_file_to_drive(
+                video_path,
+                f"{request.request_id}.mp4",
+                DRIVE_OUTPUT_FOLDER_ID,
+            )
+        else:
+            video_url = f"{base_url}/v1/files/{request.request_id}/video"
 
         if subtitle_size > 0 and os.path.exists(subtitle_path):
-            subtitle_url = f"{base_url}/v1/files/{request.request_id}/subtitle"
+            if DRIVE_OUTPUT_FOLDER_ID:
+                subtitle_url = _upload_file_to_drive(
+                    subtitle_path,
+                    f"{request.request_id}.srt",
+                    DRIVE_OUTPUT_FOLDER_ID,
+                    mimetype="text/plain",
+                )
+            else:
+                subtitle_url = f"{base_url}/v1/files/{request.request_id}/subtitle"
 
         supplementary_url: Optional[Union[str, list[str]]] = None
         if supplementary_files:
-            supp_urls = [
-                f"{base_url}/v1/files/{request.request_id}/supplementary/{Path(p).name}"
-                for p in supplementary_files
-            ]
+            if DRIVE_OUTPUT_FOLDER_ID:
+                supp_urls = [
+                    _upload_file_to_drive(
+                        p,
+                        Path(p).name,
+                        DRIVE_OUTPUT_FOLDER_ID,
+                        mimetype="application/octet-stream",
+                    )
+                    for p in supplementary_files
+                ]
+            else:
+                supp_urls = [
+                    f"{base_url}/v1/files/{request.request_id}/supplementary/{Path(p).name}"
+                    for p in supplementary_files
+                ]
             supplementary_url = supp_urls[0] if len(supp_urls) == 1 else supp_urls
 
         return VideoGenerateResponse(
