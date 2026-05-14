@@ -221,21 +221,17 @@ async def generate_video(request: VideoGenerateRequest, ori_req: Request):
         request_output_dir = _safe_request_dir(output_base, request.request_id)
         os.makedirs(request_output_dir, exist_ok=True)
 
-        # Create a pipeline instance for this request with unique output paths
-        request_pipeline = VideoGenerationPipeline(
-            llm_client=pipeline.llm_client,
-            app_config=app_config,
-            output_video_name=f"{request.request_id}.mp4",
-            final_video_dir=request_output_dir,
-        )
-        request_pipeline.load()
+        # Redirect this request's video output to a per-request directory.
+        # Models stay loaded in the global pipeline — do NOT call .load() again.
+        video_name = f"{request.request_id}.mp4"
+        pipeline.video_output_path = os.path.join(request_output_dir, video_name)
 
-        # Run pipeline (this is CPU/IO intensive, so we run it in a thread pool)
+        # Run pipeline (CPU/IO intensive — execute in a thread pool)
         loop = asyncio.get_event_loop()
         result = await asyncio.wait_for(
             loop.run_in_executor(
                 None,
-                request_pipeline.run,
+                pipeline.run,
                 request.course_requirement,  # requirement_prompt
                 request.student_persona,  # persona_prompt
             ),
