@@ -6,6 +6,7 @@ in docs/api/video-generation.md
 """
 
 import asyncio
+from asyncio import Lock
 import os
 import shutil
 from pathlib import Path
@@ -195,6 +196,7 @@ app = FastAPI(
 # Global pipeline instance (loaded once at startup)
 pipeline: Optional[VideoGenerationPipeline] = None
 app_config: Optional[AppConfig] = None
+pipeline_lock = Lock()  # serialise concurrent requests — shared state in pipeline is not thread-safe
 
 
 @app.on_event("startup")
@@ -255,22 +257,25 @@ async def generate_video(request: VideoGenerateRequest, ori_req: Request):
         request_output_dir = _safe_request_dir(output_base, request.request_id)
         os.makedirs(request_output_dir, exist_ok=True)
 
-        # Redirect this request's video output to a per-request directory.
-        # Models stay loaded in the global pipeline — do NOT call .load() again.
-        video_name = f"{request.request_id}.mp4"
-        pipeline.video_output_path = os.path.join(request_output_dir, video_name)
+        # Serialise generation — pipeline uses shared global state and fixed temp
+        # directories, so concurrent calls would corrupt each other's output.
+        async with pipeline_lock:
+            # Redirect output to this request's directory.
+            # Models stay loaded in the global pipeline — do NOT call .load() again.
+            video_name = f"{request.request_id}.mp4"
+            pipeline.video_output_path = os.path.join(request_output_dir, video_name)
 
-        # Run pipeline (CPU/IO intensive — execute in a thread pool)
-        loop = asyncio.get_event_loop()
-        result = await asyncio.wait_for(
-            loop.run_in_executor(
-                None,
-                pipeline.run,
-                request.course_requirement,  # requirement_prompt
-                request.student_persona,  # persona_prompt
-            ),
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
+            # Run pipeline (CPU/IO intensive — execute in a thread pool)
+            loop = asyncio.get_event_loop()
+            result = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    pipeline.run,
+                    request.course_requirement,  # requirement_prompt
+                    request.student_persona,  # persona_prompt
+                ),
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
 
         video_path = result["final_video_path"]
         _ensure_size_limit(video_path, MAX_VIDEO_BYTES, "video")
