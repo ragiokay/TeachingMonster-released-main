@@ -221,7 +221,7 @@ async def startup_event():
     # Load all models (this may take time)
     print("Loading pipeline models...")
     pipeline.load()
-    print("Pipeline loaded successfully!")
+    print("Pipeline loaded successfully!", flush=True)
 
 
 @app.post("/v1/video/generate", response_model=VideoGenerateResponse)
