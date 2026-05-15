@@ -156,6 +156,10 @@ class VideoGenerationPipeline:
         slide_image_paths: List[str] = []
         for idx in range(1, len(slides_struct) + 1):
             img_path = os.path.join(slides_folder, f"{idx}.jpg")
+            if not os.path.exists(img_path):
+                # LibreOffice conversion failed for this slide — use blank white frame
+                blank = Image.new("RGB", (1280, 720), color=(255, 255, 255))
+                blank.save(img_path)
             slide_image_paths.append(img_path)
             slide_images.append(Image.open(img_path))
 

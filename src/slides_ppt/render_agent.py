@@ -185,9 +185,13 @@ class RenderAgent:
 
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
+                # Use a per-call user profile so concurrent LibreOffice processes
+                # don't conflict over the shared ~/.config/libreoffice lock.
+                user_profile = f"file://{tmp_dir}/lo_profile"
                 result = subprocess.run(
-                    [libreoffice, "--headless", "--norestore", "--convert-to", "png",
-                     "--outdir", tmp_dir, pptx_path],
+                    [libreoffice, "--headless", "--norestore",
+                     f"-env:UserInstallation={user_profile}",
+                     "--convert-to", "png", "--outdir", tmp_dir, pptx_path],
                     capture_output=True,
                     text=True,
                     timeout=60,
