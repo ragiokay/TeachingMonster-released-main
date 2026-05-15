@@ -3,7 +3,12 @@ import json
 import os
 from src.gemini_client import GeminiClient
 from google.genai import types
-from .schemas import SlideSpecs, ScriptOutput, AnimationScript
+from .schemas import SlideSpecs, ScriptOutput, AnimationScript, SlideWithScript
+from pydantic import BaseModel
+from typing import List as _List
+
+class _SlideWithScriptOutput(BaseModel):
+    slides: _List[SlideWithScript]
 
 
 class Wrapper_PPT:
@@ -176,6 +181,71 @@ class Wrapper_PPT:
 
         return scripts_map
 
+    def generate_slides_and_scripts(self, outline: str) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Generate slide specs AND scripts in a single LLM call (saves ~15-20s)."""
+        import os
+        max_slides = int(os.environ.get("MAX_SLIDES", "6"))
+        print("\n[Wrapper_PPT] Generating slides + scripts (combined call)...")
+        prompt = f"""
+You are an expert Presentation Designer and engaging lecturer.
+Convert the course outline into a slide deck with spoken narration.
+
+HARD LIMITS:
+- EXACTLY {max_slides} slides total (no more, no fewer).
+- Each slide's "script" MUST be 20-30 words MAXIMUM. Be extremely concise.
+- Output ONLY valid JSON matching the schema.
+
+Slide deck MUST include:
+- Slide 1: Catchy opening/title slide
+- Slide {max_slides}: Strong conclusion/summary slide
+- Middle slides: Core content
+
+For each slide provide:
+- "id": "slide1", "slide2", ...
+- "content": slide layout with text items and visual descriptions
+- "script": 20-30 word spoken narration (STRICT LIMIT)
+
+Course outline:
+{outline}
+"""
+        response = self.llm.generate_content_with_fallback(
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=_SlideWithScriptOutput,
+            ),
+        )
+        try:
+            parsed = response.parsed
+            def sort_key(k):
+                try:
+                    return int(k.id.replace("slide", ""))
+                except:
+                    return 999
+            sorted_slides = sorted(parsed.slides, key=sort_key)
+
+            specs_list = [s.content.model_dump() for s in sorted_slides]
+            scripts_list = [s.script for s in sorted_slides]
+            self._log_to_history("[Wrapper_PPT] combined slides+scripts", {"count": len(specs_list)})
+            return specs_list, scripts_list
+        except Exception as e:
+            print(f"Combined call failed ({e}), falling back to two-call path")
+            specs = self.generate_slide_specs(outline)
+            scripts_map = self.generate_slide_scripts(specs)
+            def sort_key2(k):
+                try:
+                    return int(k.replace("slide", ""))
+                except:
+                    return 999
+            sorted_keys = sorted(specs.keys(), key=sort_key2)
+            specs_list = []
+            scripts_list = []
+            for key in sorted_keys:
+                content_obj = specs[key]
+                specs_list.append(content_obj.model_dump() if hasattr(content_obj, "model_dump") else content_obj)
+                scripts_list.append(scripts_map.get(key, ""))
+            return specs_list, scripts_list
+
     def run(self, outline: str) -> Tuple[List[Dict[str, Any]], List[str]]:
         """
         Generates Slide Specs and Slide Scripts using LLM (Structured Output).
@@ -183,48 +253,12 @@ class Wrapper_PPT:
         """
         assert self.is_loaded, "Call load() before run()"
 
-        # Input validation
         if not isinstance(outline, str):
             raise TypeError(f"Expected outline to be a str, got {type(outline)}")
-
         if len(outline) == 0:
             raise ValueError("outline str cannot be empty")
 
-        # 1. Generate Slide Specs
-        # specs is Dict[str, SlideContent] (Pydantic objects)
-        specs = self.generate_slide_specs(outline)
-
-        # 2. Generate Slide Script
-        scripts_map = self.generate_slide_scripts(specs)
-
-        # 3. Combine into requested Tuple output
-        specs_list = []
-        scripts_list = []
-
-        # Sort keys
-        def sort_key(k):
-            try:
-                return int(k.replace("slide", ""))
-            except:
-                return 999
-
-        sorted_keys = sorted(specs.keys(), key=sort_key)
-
-        for key in sorted_keys:
-            # Append spec
-            # Convert Pydantic object to dict for final output
-            content_obj = specs[key]
-            content_dict = (
-                content_obj.model_dump()
-                if hasattr(content_obj, "model_dump")
-                else content_obj
-            )
-            specs_list.append(content_dict)
-
-            # Append corresponding script (or empty if missing)
-            scripts_list.append(scripts_map.get(key, ""))
-
-        return specs_list, scripts_list
+        return self.generate_slides_and_scripts(outline)
 
 
 class Wrapper_3B1B:

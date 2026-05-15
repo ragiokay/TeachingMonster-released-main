@@ -38,6 +38,12 @@ class SlideContent(BaseModel):
     layout: str = Field(..., description="Descriptive layout instructions")
 
 
+class SlideWithScript(BaseModel):
+    id: str = Field(..., description="Slide ID, e.g. slide1")
+    content: SlideContent = Field(..., description="Slide content")
+    script: str = Field(..., description="Spoken narration, 20-30 words MAX")
+
+
 class SlideItem(BaseModel):
     id: str = Field(..., description="ID of the slide, e.g. slide1")
     content: SlideContent = Field(..., description="Content of the slide")
