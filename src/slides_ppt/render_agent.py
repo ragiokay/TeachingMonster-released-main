@@ -64,6 +64,9 @@ class RenderAgent:
         # Image generation setup — initialize eagerly for thread safety
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
         self._imagen_client = self._init_imagen_client()
+        # Per-video image cap: MAX_IMAGEN_IMAGES=1 → only 1 image per video, 0 = unlimited
+        self._imagen_max = int(os.getenv("MAX_IMAGEN_IMAGES", "0"))
+        self._imagen_count = 0
 
     def log(self, message: str) -> None:
         """Print a log message with agent name prefix."""
@@ -71,6 +74,8 @@ class RenderAgent:
 
     def _init_imagen_client(self):
         """Initialize Gemini client for image generation (called once at init)."""
+        if os.getenv("DISABLE_IMAGEN"):
+            return None
         if HAS_GEMINI_IMAGEN and self.gemini_api_key:
             return genai.Client(api_key=self.gemini_api_key)
         return None
@@ -243,8 +248,11 @@ class RenderAgent:
             if os.path.exists(generated_path):
                 self.log(f"Using cached image: {generated_path}")
                 elements[i]["path"] = generated_path
+            elif self._imagen_max > 0 and self._imagen_count >= self._imagen_max:
+                self.log(f"MAX_IMAGEN_IMAGES={self._imagen_max} reached, skipping image for this slide")
             else:
                 self.log(f"Need to generate image for prompt: '{prompt[:50]}...' (aspect_ratio={aspect_ratio})")
+                self._imagen_count += 1
                 pending.append((i, prompt, aspect_ratio, generated_path))
 
         # Second pass: generate all pending images concurrently
