@@ -42,7 +42,7 @@ class GeminiClient:
         if self.config.default_model:
             models.append(self.config.default_model)
 
-        raw = os.getenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-flash,gemini-1.5-flash")
+        raw = os.getenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-flash,gemini-2.0-flash")
         for part in raw.split(","):
             model = part.strip()
             if model:
