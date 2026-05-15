@@ -257,9 +257,18 @@ class T2VOutlineModule:
         course_topic = context_data["course_topic"]
         print(f"[T2VOutlineModule] Blueprint created for topic: {course_topic}")
 
-        # 2. Generate the full module outline
-        print("[T2VOutlineModule] Generating module outline...")
-        outline = self.create_module_outline(blueprint, course_topic)
-        print("[T2VOutlineModule] Outline generation complete.")
+        # 2. Format blueprint as a concise outline (no extra LLM call)
+        import os
+        max_slides = int(os.environ.get("MAX_SLIDES", "6"))
+        objectives = "; ".join(blueprint.learning_objectives[:4])
+        outline = (
+            f"# {course_topic}\n\n"
+            f"**Topic:** {course_topic}\n"
+            f"**Design principles:** {blueprint.design_manifesto}\n"
+            f"**Learning objectives:** {objectives}\n"
+            f"**Student profile:** {blueprint.persona_scoping_analysis}\n\n"
+            f"Generate exactly {max_slides} slides covering the key concepts of this topic."
+        )
+        print("[T2VOutlineModule] Outline ready (fast path — no extra LLM call).")
 
         return outline
