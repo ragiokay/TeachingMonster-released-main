@@ -63,9 +63,13 @@ class Wrapper_PPT:
 
     def generate_slide_specs(self, outline: str) -> Dict[str, Any]:
         """Generates Slide Specs from outline using structured output."""
+        import os
+        max_slides = int(os.environ.get("MAX_SLIDES", "6"))
         print("\n[Wrapper_PPT] Generating Slide Specs...")
         prompt_specs = f"""
             You are an expert Presentation Designer, JSON Data Architect, and educator. Your mission is to craft professional yet highly engaging and subtly humorous course presentations that keep learners wide awake. You will receive a comprehensive "Structured Course Storyboard" as input. Your task is to execute this blueprint by converting it into a single JSON output that represents the final, fully-furnished slide deck.
+
+            HARD LIMIT: The deck MUST contain EXACTLY {max_slides} slides (no more, no fewer). Consolidate content aggressively into these {max_slides} slides.
 
             Output requirements:
 
@@ -139,10 +143,10 @@ class Wrapper_PPT:
         ### INSTRUCTIONS:
         1. **Analyze the Input**: Review the visuals and content for each slide.
         2. **Draft the Live Script**: Create a highly conversational, natural spoken script for each slide, exactly as you would speak it on a live stage or in a dynamic classroom.
-        - **Audience Engagement**: Use non-interactive rhetorical questions (questions that make the audience think without expecting a verbal answer), inclusive language ("we", "let's look at"), and conversational hooks (e.g., "Imagine...", "Have you ever noticed..."). Strictly avoid interactive prompts that wait for audience participation (e.g., do not ask for a show of hands).
-        - **Visual Direction**: Explicitly and naturally direct the audience's attention to visual elements as if you are pointing at a screen (e.g., "Take a look at this chart right here...", "Notice this upward trend...", "If you focus on the left side...").
-        - **Flow and Transitions**: Ensure smooth, logical transitions from one slide to the next. The script must read like a continuous, compelling narrative, not disconnected bullet points.
-        - **Spoken Dynamics**: Emulate real human speech patterns. Use short sentences, natural filler words at the start of thoughts (e.g., "Now,", "So,", "But here's the catch..."), and create rhythm.
+        - **LENGTH LIMIT (CRITICAL)**: Each slide script MUST be 40-60 words maximum. Be extremely concise. One key idea per slide. Do NOT exceed 60 words per slide under any circumstances.
+        - **Audience Engagement**: Use non-interactive rhetorical questions and conversational hooks (e.g., "Imagine...", "So,"). Strictly avoid interactive prompts.
+        - **Visual Direction**: Briefly direct the audience's attention to visual elements (e.g., "Look at this chart...", "Notice...").
+        - **Flow and Transitions**: Ensure smooth, logical transitions. Short, punchy sentences.
 
         ### OUTPUT FORMAT:
         * Output **only valid JSON** (no markdown formatting blocks like ```json, no extra text).

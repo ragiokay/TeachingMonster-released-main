@@ -175,10 +175,11 @@ class T2VOutlineModule:
             - Pedagogical Pacing: Deliberately dismantle large, complex concepts into logical sequences spanning 3 to 5 slides to optimize information density and learner comprehension.
             - Visual & Layout Directives: Explicitly map out the specific visual elements and spatial arrangements required for each knowledge point.
 
-            COURSE LENGTH (Do not hardcode)
-            - Decide the total number of modules/sequences based on topic complexity + persona fit implied by the blueprint inputs.
-            - Keep the structure minimal-but-sufficient to achieve the Learning Objectives under the Design Manifesto.
-            - Think of this as the detailed construction blueprint (wiring, plumbing) that turns the conceptual framework (your inputs) into a fully furnished home (the final slides).
+            COURSE LENGTH (STRICT HARD LIMIT — do not exceed)
+            - MAXIMUM 2 modules/sequences total.
+            - Each module uses AT MOST 3 slides (including the mandatory Opening and Conclusion slides which count toward the total).
+            - TOTAL SLIDE COUNT MUST NOT EXCEED 6. Consolidate aggressively.
+            - Keep the structure minimal-but-sufficient to achieve only the CORE Learning Objectives.
 
             INPUTS
             **Course Topic:** {course_topic}
@@ -235,7 +236,6 @@ class T2VOutlineModule:
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="text/plain",
-                tools=[types.Tool(google_search=types.GoogleSearch())],
             ),
         )
 

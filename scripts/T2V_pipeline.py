@@ -143,6 +143,9 @@ class VideoGenerationPipeline:
         # Breaks outlines into slide-by-slide structure and narration scripts.
         # =============================
         slides_struct, scripts = self.wrapper.run(outlines)
+        max_slides = int(os.environ.get("MAX_SLIDES", "6"))
+        slides_struct = slides_struct[:max_slides]
+        scripts = scripts[:max_slides]
         json.dump(slides_struct, open("tmp/slides_struct.json", "w+", encoding="utf-8"), ensure_ascii=False, indent=4)
         json.dump(scripts, open("tmp/scripts.json", "w+", encoding="utf-8"), ensure_ascii=False, indent=4)
 
