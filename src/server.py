@@ -452,6 +452,14 @@ async def get_supplementary(request_id: str, filename: str):
     return FileResponse(str(file_path), media_type=media_type, filename=filename)
 
 
+@app.get("/v1/test/sleep/{seconds}")
+async def test_sleep(seconds: int):
+    """Test how long ngrok keeps a connection alive before cutting it."""
+    import asyncio
+    await asyncio.sleep(min(int(seconds), 3600))
+    return {"slept": seconds, "status": "ok"}
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
