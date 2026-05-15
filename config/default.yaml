@@ -17,9 +17,9 @@ pipeline:
   slides_type: PPT
 
 ppt:
-  max_retries: 3
+  max_retries: 2
   retry_base_delay: 1.0
-  max_review_rounds: 2
+  max_review_rounds: 0
   review_threshold: 7.0
 
 output:
